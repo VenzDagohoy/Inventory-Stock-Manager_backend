@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import { pool } from "./database.js";
 import productController from "./controller.js";
+import authRoutes from "./routes/authRoutes.js";
+import authenticateToken from "./middleware/authenticateToken.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -16,13 +18,18 @@ app.get("/", (req, res) => {
     });
 });
 
-// REST routes
-app.get("/products", productController.getAllProducts);
-app.get("/products/:id", productController.getProductById);
-app.post("/products", productController.addProduct);
-app.patch("/products/:id/sell", productController.sellProduct);
-app.put("/products/:id", productController.updateProduct);
-app.delete("/products/:id", productController.deleteProduct);
+// Authentication Routes
+app.use("/auth", authRoutes);
+
+// Protected REST routes (Users can only view and manage their own inventory items)
+app.get("/products", authenticateToken, productController.getAllProducts);
+app.get("/products/:id", authenticateToken, productController.getProductById);
+app.post("/products", authenticateToken, productController.addProduct);
+app.patch("/products/:id/sell", authenticateToken, productController.sellProduct);
+app.put("/products/:id", authenticateToken, productController.updateProduct);
+app.delete("/products/:id", authenticateToken, productController.deleteProduct);
+app.post("/products/reset-daily", authenticateToken, productController.resetDailyStats);
+app.get("/history", authenticateToken, productController.getHistory);
 
 async function startServer() {
     try {

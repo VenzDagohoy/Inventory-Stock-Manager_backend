@@ -3,10 +3,13 @@ import { ProductModel } from "./model.js";
 
 const productModel = new ProductModel(pool);
 
+// --- PRODUCT REST CONTROLLERS ---
+
 const getAllProducts = async (req, res) => {
     try {
+        const userId = req.user.userId;
         const { name } = req.query;
-        const products = await productModel.getAll(name);
+        const products = await productModel.getAll(userId, name);
         res.json({ products });
     } catch (error) {
         console.error(error);
@@ -16,8 +19,9 @@ const getAllProducts = async (req, res) => {
 
 const getProductById = async (req, res) => {
     try {
+        const userId = req.user.userId;
         const id = Number(req.params.id);
-        const foundProduct = await productModel.getById(id);
+        const foundProduct = await productModel.getById(id, userId);
         
         if (!foundProduct) {
             return res.status(404).json({ message: "Product not found." });
@@ -31,13 +35,13 @@ const getProductById = async (req, res) => {
 
 const addProduct = async (req, res) => {
     try {
-        // Validate name
+        const userId = req.user.userId;
+
         if (typeof req.body.name !== "string" || !req.body.name.trim()) {
             return res.status(400).json({ message: "Product name is required" });
         }
         const formattedName = req.body.name.toUpperCase().trim();
 
-        // Validate price, dont alaw negative
         let price = 0;
         if (req.body.price !== undefined) {
             price = Number(req.body.price);
@@ -46,7 +50,6 @@ const addProduct = async (req, res) => {
             }
         }
 
-        // Validate stock, dont alaw negative
         let stock = 0;
         if (req.body.stock !== undefined) {
             stock = Number(req.body.stock);
@@ -55,13 +58,12 @@ const addProduct = async (req, res) => {
             }
         }
 
-        // Check duplicate
-        const existingProduct = await productModel.getByName(formattedName);
+        const existingProduct = await productModel.getByName(userId, formattedName);
         if (existingProduct) {
             return res.status(400).json({ message: "Product already exists" });
         }
 
-        const newProduct = await productModel.create(formattedName, price, stock);
+        const newProduct = await productModel.create(userId, formattedName, price, stock);
         res.status(201).json({
             message: "Product added successfully",
             product: newProduct
@@ -74,8 +76,9 @@ const addProduct = async (req, res) => {
 
 const sellProduct = async (req, res) => {
     try {
+        const userId = req.user.userId;
         const id = Number(req.params.id);
-        const success = await productModel.sell(id);
+        const success = await productModel.sell(id, userId);
         
         if (!success) {
             return res.status(400).json({ 
@@ -83,7 +86,7 @@ const sellProduct = async (req, res) => {
             });
         }
         
-        const updatedProduct = await productModel.getById(id);
+        const updatedProduct = await productModel.getById(id, userId);
         res.json({
             message: "Item sold successfully!",
             product: updatedProduct
@@ -96,8 +99,9 @@ const sellProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
     try {
+        const userId = req.user.userId;
         const id = Number(req.params.id);
-        const foundProduct = await productModel.getById(id);
+        const foundProduct = await productModel.getById(id, userId);
         
         if (!foundProduct) {
             return res.status(404).json({ message: "Product not found." });
@@ -108,21 +112,18 @@ const updateProduct = async (req, res) => {
         let updatedPrice = foundProduct.price;
         let updatedStock = foundProduct.stock;
 
-        // Validate and update name
         if (name !== undefined) {
             if (typeof name !== "string" || !name.trim()) {
                 return res.status(400).json({ message: "Name is required and must be a string" });
             }
             const formattedName = name.toUpperCase().trim();
-            const duplicateCheck = await productModel.getByNameExcludingId(formattedName, id);
+            const duplicateCheck = await productModel.getByNameExcludingId(userId, formattedName, id);
             
             if (duplicateCheck) {
                 return res.status(400).json({ message: "Product name already exists" });
             }
             updatedName = formattedName;
         }
-
-        // Validate and update price
         if (price !== undefined) {
             const parsedPrice = Number(price);
             if (isNaN(parsedPrice) || parsedPrice < 0) {
@@ -130,8 +131,6 @@ const updateProduct = async (req, res) => {
             }
             updatedPrice = parsedPrice;
         }
-
-        // Validate and update stock
         if (stock !== undefined) {
             const parsedStock = Number(stock);
             if (isNaN(parsedStock) || parsedStock < 0 || !Number.isInteger(parsedStock)) {
@@ -140,7 +139,7 @@ const updateProduct = async (req, res) => {
             updatedStock = parsedStock;
         }
 
-        const updatedProduct = await productModel.update(id, updatedName, updatedPrice, updatedStock);
+        const updatedProduct = await productModel.update(id, userId, updatedName, updatedPrice, updatedStock);
         res.json({
             message: "Product updated successfully",
             product: updatedProduct
@@ -153,8 +152,9 @@ const updateProduct = async (req, res) => {
 
 const deleteProduct = async (req, res) => {
     try {
+        const userId = req.user.userId;
         const id = Number(req.params.id);
-        const deleted = await productModel.delete(id);
+        const deleted = await productModel.delete(id, userId);
         
         if (!deleted) {
             return res.status(404).json({ message: "Product not found" });
@@ -168,11 +168,51 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+// --- DAILY HISTORY CONTROLLERS ---
+
+const resetDailyStats = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        
+        // 1. Get current totals
+        const stats = await productModel.getOverallStats(userId);
+        
+        // Prevent creating an empty history entry if nothing was sold
+        if (stats.total_sold == 0) {
+            return res.status(400).json({ message: "Nothing to reset. No items sold yet." });
+        }
+
+        // 2. Save to history table
+        await productModel.saveDailyHistory(userId, stats.total_sold, stats.total_earnings);
+        
+        // 3. Reset product sold counts to 0
+        await productModel.resetSoldCounts(userId);
+
+        res.json({ message: "Daily stats reset successfully and saved to history." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Database error", error: error.message });
+    }
+};
+
+const getHistory = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const history = await productModel.getHistory(userId);
+        res.json({ history });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Database error", error: error.message });
+    }
+};
+
 export default {
     getAllProducts,
     getProductById,
     addProduct,
     sellProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    resetDailyStats,
+    getHistory
 };
