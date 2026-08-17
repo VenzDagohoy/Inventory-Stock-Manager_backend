@@ -17,6 +17,7 @@ export class ProductModel {
             // Return the matching products
             return rows;
         }
+
         // Fetch all products for the user
         const [rows] = await this.pool.execute(
             "SELECT * FROM products WHERE user_id = ? ORDER BY id ASC",
@@ -108,8 +109,8 @@ export class ProductModel {
         // Fetch the sum of sold items and earnings
         const [rows] = await this.pool.execute(
             `SELECT 
-                IFNULL(SUM(sold), 0) AS total_sold, 
-                IFNULL(SUM(price * sold), 0) AS total_earnings 
+                 IFNULL(SUM(sold), 0) AS total_sold, 
+                 IFNULL(SUM(price * sold), 0) AS total_earnings 
              FROM products WHERE user_id = ?`,
             [userId]
         );
@@ -117,13 +118,22 @@ export class ProductModel {
         return rows[0];
     }
 
-    // Save the daily totals to the history table
-    async saveDailyHistory(userId, totalSold, totalEarnings) {
+    // Fetch individual items that were sold today
+    async getItemsSoldToday(userId) {
+        const [rows] = await this.pool.execute(
+            "SELECT name, price, sold FROM products WHERE user_id = ? AND sold > 0",
+            [userId]
+        );
+        return rows;
+    }
+
+    // Save the daily totals and item details to the history table
+    async saveDailyHistory(userId, totalSold, totalEarnings, itemsDetails) {
         // Insert the daily record into the database
         await this.pool.execute(
-            `INSERT INTO daily_history (user_id, record_date, total_sold, total_earnings) 
-             VALUES (?, CURDATE(), ?, ?)`,
-            [userId, totalSold, totalEarnings]
+            `INSERT INTO daily_history (user_id, record_date, total_sold, total_earnings, items_sold_details) 
+             VALUES (?, CURDATE(), ?, ?, ?)`,
+            [userId, totalSold, totalEarnings, itemsDetails]
         );
     }
 

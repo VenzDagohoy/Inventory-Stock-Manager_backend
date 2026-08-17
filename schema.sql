@@ -21,30 +21,32 @@ CREATE TABLE products (
     stock INT UNSIGNED NOT NULL DEFAULT 0,
     sold INT UNSIGNED NOT NULL DEFAULT 0,
     
-    -- Link product to the user who created it
+    -- Link product to user
     CONSTRAINT fk_product_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     
-    -- Enforce unique product names only within the same user's inventory
+    -- Enforce product names only within the same users inventory
     CONSTRAINT unique_user_product_name UNIQUE (user_id, name)
 );
 
--- Add this to your existing inventory_db
-
-CREATE TABLE daily_history (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    record_date DATE NOT NULL,
-    total_sold INT UNSIGNED NOT NULL DEFAULT 0,
-    total_earnings DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Link history to the user
-    CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+-- Daily history  
+CREATE TABLE daily_history (     
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,     
+    user_id INT UNSIGNED NOT NULL,     
+    record_date DATE NOT NULL,     
+    total_sold INT UNSIGNED NOT NULL DEFAULT 0,     
+    total_earnings DECIMAL(10, 2) NOT NULL DEFAULT 0.00,     
+    items_sold_details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,          
+    -- Link history to user     
+    CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE 
 );
 
+--Display table
 SELECT * FROM users;
 SELECT * FROM products;
+SELECT * FROM daily_history;
 
 -- Drop table
 DROP TABLE products;
 DROP TABLE users;
+DROP TABLE daily_history;

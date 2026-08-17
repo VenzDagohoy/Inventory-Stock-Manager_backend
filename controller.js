@@ -14,6 +14,7 @@ const getAllProducts = async (req, res) => {
         const userId = req.user.userId;
         // Get the search keyword from the url query
         const { name } = req.query;
+
         // Fetch the products from the database
         const products = await productModel.getAll(userId, name);
         // Send the products to the frontend
@@ -35,6 +36,7 @@ const getProductById = async (req, res) => {
         const userId = req.user.userId;
         // Get the product id from the url parameters
         const id = Number(req.params.id);
+
         // Search the product in the database
         const foundProduct = await productModel.getById(id, userId);
         
@@ -43,6 +45,7 @@ const getProductById = async (req, res) => {
             // Return error status for missing product
             return res.status(404).json({ message: "Product not found." });
         }
+
         // Send the product to the frontend
         res.json({ product: foundProduct });
     // Catch any errors that happen
@@ -105,6 +108,7 @@ const addProduct = async (req, res) => {
 
         // Save the new product to the database
         const newProduct = await productModel.create(userId, formattedName, price, stock);
+
         // Return success status with the created product data
         res.status(201).json({
             message: "Product added successfully",
@@ -127,6 +131,7 @@ const sellProduct = async (req, res) => {
         const userId = req.user.userId;
         // Get the product id from the url parameters
         const id = Number(req.params.id);
+
         // Subtract stock and add to the sold count
         const success = await productModel.sell(id, userId);
         
@@ -140,6 +145,7 @@ const sellProduct = async (req, res) => {
         
         // Fetch the updated product details from the database
         const updatedProduct = await productModel.getById(id, userId);
+
         // Send success message and the updated product to the frontend
         res.json({
             message: "Item sold successfully!",
@@ -162,6 +168,7 @@ const updateProduct = async (req, res) => {
         const userId = req.user.userId;
         // Get the product id from the url parameters
         const id = Number(req.params.id);
+
         // Search the product in the database
         const foundProduct = await productModel.getById(id, userId);
         
@@ -173,6 +180,7 @@ const updateProduct = async (req, res) => {
 
         // Extract name, price, and stock from the request body
         const { name, price, stock } = req.body;
+
         // Keep the old name if no new name is provided
         let updatedName = foundProduct.name;
         // Keep the old price if no new price is provided
@@ -189,6 +197,7 @@ const updateProduct = async (req, res) => {
             }
             // Make the new name uppercase and remove extra spaces
             const formattedName = name.toUpperCase().trim();
+
             // Check if another product already uses this name
             const duplicateCheck = await productModel.getByNameExcludingId(userId, formattedName, id);
             
@@ -197,9 +206,11 @@ const updateProduct = async (req, res) => {
                 // Return error status for duplicate name
                 return res.status(400).json({ message: "Product name already exists" });
             }
+
             // Apply the new name
             updatedName = formattedName;
         }
+
         // Check if a new price was provided
         if (price !== undefined) {
             // Convert the price into a number
@@ -212,6 +223,7 @@ const updateProduct = async (req, res) => {
             // Apply the new price
             updatedPrice = parsedPrice;
         }
+
         // Check if a new stock was provided
         if (stock !== undefined) {
             // Convert the stock into a number
@@ -227,11 +239,13 @@ const updateProduct = async (req, res) => {
 
         // Save the updated product to the database
         const updatedProduct = await productModel.update(id, userId, updatedName, updatedPrice, updatedStock);
+
         // Send success message and updated product to the frontend
         res.json({
             message: "Product updated successfully",
             product: updatedProduct
         });
+
     // Catch any errors that happen
     } catch (error) {
         // Print the error to the console
@@ -249,6 +263,7 @@ const deleteProduct = async (req, res) => {
         const userId = req.user.userId;
         // Get the product id from the url parameters
         const id = Number(req.params.id);
+
         // Delete the product from the database
         const deleted = await productModel.delete(id, userId);
         
@@ -257,10 +272,12 @@ const deleteProduct = async (req, res) => {
             // Return error status for missing product
             return res.status(404).json({ message: "Product not found" });
         }
+
         // Send success message to the frontend
         res.json({
             message: "Product deleted successfully"
         });
+
     // Catch any errors that happen
     } catch (error) {
         // Print the error to the console
@@ -286,14 +303,20 @@ const resetDailyStats = async (req, res) => {
             return res.status(400).json({ message: "Nothing to reset. No items sold yet." });
         }
 
-        // Save the totals to the history table
-        await productModel.saveDailyHistory(userId, stats.total_sold, stats.total_earnings);
+        // Fetch the specific items sold today
+        const itemsSold = await productModel.getItemsSoldToday(userId);
+        // Convert the array into a JSON string to store in the database
+        const itemsDetailsString = JSON.stringify(itemsSold);
+        
+        // Save the totals and the item breakdown string to the history table
+        await productModel.saveDailyHistory(userId, stats.total_sold, stats.total_earnings, itemsDetailsString);
         
         // Reset all product sold counts back to zero
         await productModel.resetSoldCounts(userId);
-
+        
         // Send success message to the frontend
         res.json({ message: "Daily stats reset successfully and saved to history." });
+        
     // Catch any errors that happen
     } catch (error) {
         // Print the error to the console
@@ -309,10 +332,13 @@ const getHistory = async (req, res) => {
     try {
         // Get the user id from the login token
         const userId = req.user.userId;
+
         // Fetch the history records from the database
         const history = await productModel.getHistory(userId);
+
         // Send the history to the frontend
         res.json({ history });
+
     // Catch any errors that happen
     } catch (error) {
         // Print the error to the console
