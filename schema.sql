@@ -1,7 +1,7 @@
 CREATE DATABASE IF NOT EXISTS inventory_db;
 USE inventory_db;
 
--- Users Table
+-- User table
 CREATE TABLE users (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE users (
     UNIQUE KEY unique_user_email (email)
 );
 
--- Products Table
+-- Products table
 CREATE TABLE products (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id INT UNSIGNED NOT NULL,
@@ -41,12 +41,7 @@ CREATE TABLE daily_history (
     CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE 
 );
 
---Display table
+--  Display table
 SELECT * FROM users;
 SELECT * FROM products;
 SELECT * FROM daily_history;
-
--- Drop table
-DROP TABLE products;
-DROP TABLE users;
-DROP TABLE daily_history;
